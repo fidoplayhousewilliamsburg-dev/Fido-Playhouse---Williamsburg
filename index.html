@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fido Playhouse - Williamsburg</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0d1117;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      color: #fff;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 40px;
+      height: 64px;
+      background: rgba(13,17,23,0.92);
+      backdrop-filter: blur(8px);
+      z-index: 100;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    #store-name { font-size: 20px; font-weight: 700; }
+
+    #tab-buttons { display: flex; gap: 8px; }
+
+    .tab-btn {
+      padding: 8px 20px;
+      border-radius: 100px;
+      border: 1px solid rgba(255,255,255,0.15);
+      background: transparent;
+      color: rgba(255,255,255,0.55);
+      font-size: 14px; font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tab-btn.active { background: #fff; color: #0d1117; border-color: #fff; }
+    .tab-btn:hover:not(.active) { background: rgba(255,255,255,0.1); color: #fff; }
+
+    #clock { font-size: 14px; color: rgba(255,255,255,0.6); min-width: 80px; text-align: right; }
+
+    .page {
+      position: fixed;
+      inset: 64px 0 0 0;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.4s ease;
+    }
+
+    .page.active { opacity: 1; pointer-events: auto; }
+
+    #page-dogs { display: flex; align-items: center; justify-content: center; }
+
+    #dog-counter {
+      position: fixed;
+      top: 18px; left: 50%;
+      transform: translateX(-50%);
+      font-size: 14px;
+      color: rgba(255,255,255,0.5);
+      z-index: 101;
+    }
+
+    #slideshow {
+      width: 100vw;
+      height: calc(100vh - 64px);
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .slide {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; transition: opacity 0.9s ease; pointer-events: none;
+    }
+
+    .slide.active { opacity: 1; pointer-events: auto; }
+
+    .slide-bg {
+      position: absolute; inset: 0;
+      background-size: cover; background-position: center;
+      filter: blur(18px) brightness(0.35);
+      transform: scale(1.08);
+    }
+
+    .card {
+      position: relative; z-index: 2;
+      display: flex; flex-direction: column; align-items: center;
+      gap: 24px; padding: 48px 56px 40px;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 24px; backdrop-filter: blur(12px);
+      max-width: 480px; width: 90vw; text-align: center;
+    }
+
+    .dog-photo {
+      width: 220px; height: 220px; border-radius: 50%;
+      object-fit: cover; border: 4px solid rgba(255,255,255,0.2); background: #1e2531;
+    }
+
+    .dog-photo-placeholder {
+      width: 220px; height: 220px; border-radius: 50%;
+      background: #1e2531; border: 4px solid rgba(255,255,255,0.2);
+      display: flex; align-items: center; justify-content: center; font-size: 72px;
+    }
+
+    .dog-name { font-size: 38px; font-weight: 700; line-height: 1.1; }
+    .dog-breed { font-size: 18px; color: rgba(255,255,255,0.65); margin-top: -12px; }
+    .badges { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+
+    .badge { font-size: 13px; font-weight: 600; padding: 6px 16px; border-radius: 100px; }
+    .badge-type { background: rgba(99,153,34,0.25); color: #a8d96a; border: 1px solid rgba(99,153,34,0.4); }
+    .badge-checkout { background: rgba(239,159,39,0.18); color: #f5c97a; border: 1px solid rgba(239,159,39,0.35); }
+    .badge-boarding { background: rgba(83,74,183,0.25); color: #b0aaee; border: 1px solid rgba(83,74,183,0.4); }
+
+    #dots {
+      position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
+      display: flex; gap: 8px; z-index: 10;
+    }
+
+    .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: rgba(255,255,255,0.28); cursor: pointer;
+      transition: background 0.3s, transform 0.3s;
+    }
+
+    .dot.active { background: #fff; transform: scale(1.3); }
+
+    .arrow {
+      position: fixed; top: 50%; transform: translateY(-50%); z-index: 10;
+      background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);
+      color: #fff; font-size: 22px; width: 48px; height: 48px; border-radius: 50%;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s;
+    }
+
+    .arrow:hover { background: rgba(255,255,255,0.2); }
+    #prev { left: 20px; }
+    #next { right: 20px; }
+
+    #empty-dogs {
+      display: none; flex-direction: column; align-items: center;
+      gap: 16px; text-align: center; padding: 40px;
+    }
+
+    #empty-dogs .paw { font-size: 64px; }
+    #empty-dogs h2 { font-size: 26px; font-weight: 600; }
+    #empty-dogs p { color: rgba(255,255,255,0.5); font-size: 16px; }
+
+    #progress-bar {
+      position: fixed; bottom: 0; left: 0; height: 3px;
+      background: rgba(255,255,255,0.5); transition: width linear; z-index: 20;
+    }
+
+    /* GROOMING */
+    #page-grooming { overflow-y: auto; padding: 32px 40px; }
+
+    #grooming-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 24px; flex-wrap: wrap; gap: 12px;
+    }
+
+    #grooming-header h2 { font-size: 24px; font-weight: 700; }
+
+    #grooming-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+
+    .stat-card {
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px; padding: 12px 20px; text-align: center;
+    }
+
+    .stat-label { font-size: 12px; color: rgba(255,255,255,0.5); margin-bottom: 4px; }
+    .stat-value { font-size: 22px; font-weight: 700; }
+    .stat-value.green { color: #a8d96a; }
+    .stat-value.amber { color: #f5c97a; }
+
+    #grooming-table { width: 100%; border-collapse: collapse; }
+
+    #grooming-table th {
+      text-align: left; font-size: 12px; font-weight: 600;
+      color: rgba(255,255,255,0.4); text-transform: uppercase;
+      letter-spacing: 0.5px; padding: 0 16px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    #grooming-table td {
+      padding: 14px 16px; font-size: 15px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      vertical-align: middle;
+    }
+
+    .grooming-row { transition: background 0.2s; }
+    .grooming-row:hover { background: rgba(255,255,255,0.04); }
+    .grooming-row.done td { opacity: 0.45; text-decoration: line-through; }
+    .grooming-row.done td:first-child { text-decoration: none; opacity: 1; }
+
+    .check-btn {
+      width: 32px; height: 32px; border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.25);
+      background: transparent; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; transition: all 0.2s; color: transparent;
+    }
+
+    .check-btn.checked { background: #a8d96a; border-color: #a8d96a; color: #1a2a0a; }
+    .check-btn:hover:not(.checked) { border-color: #a8d96a; color: #a8d96a; }
+    .value-cell { color: #f5c97a; font-weight: 600; }
+
+    #empty-grooming {
+      text-align: center; padding: 60px 20px;
+      color: rgba(255,255,255,0.4); font-size: 16px;
+    }
+
+    #loading-grooming { text-align: center; padding: 60px; color: rgba(255,255,255,0.4); }
+
+    .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid rgba(255,255,255,0.15);
+      border-top-color: #fff; border-radius: 50%;
+      animation: spin 0.8s linear infinite; margin: 0 auto 12px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<script>
+  const CONFIG = {
+    SHEET_API_URL: "https://script.google.com/macros/s/AKfycbzD_dT7oNYz8kto7YXCzTliNkIRpOMGPSyfakpC0H76qNfEVr90fFGPohxY2Vw3nx04/exec",
+    STORE_NAME: "🐾 Fido Playhouse - Williamsburg",
+    SLIDE_DURATION: 30,
+    REFRESH_INTERVAL: 5,
+    COLUMNS: { name: 0, photo: 1, breed: 2, type: 3, checkout: 4, id: 5 }
+  };
+</script>
+
+<div id="nav">
+  <div id="store-name"></div>
+  <div id="tab-buttons">
+    <button class="tab-btn active" onclick="switchTab('dogs')">🐶 Dogs Today</button>
+    <button class="tab-btn" onclick="switchTab('grooming')">✂️ Grooming</button>
+  </div>
+  <div id="clock"></div>
+</div>
+
+<div id="dog-counter"></div>
+
+<div id="page-dogs" class="page active">
+  <div id="slideshow">
+    <div id="loading-dogs" style="display:flex;flex-direction:column;align-items:center;gap:12px;">
+      <div class="spinner"></div>
+      <p style="color:rgba(255,255,255,0.5);font-size:15px;">Loading today's guests…</p>
+    </div>
+    <div id="empty-dogs">
+      <div class="paw">🐾</div>
+      <h2>No dogs checked in right now</h2>
+      <p>New arrivals will appear here automatically</p>
+    </div>
+  </div>
+</div>
+
+<div id="page-grooming" class="page">
+  <div id="grooming-header">
+    <h2>✂️ Grooming & Bath List</h2>
+    <div id="grooming-stats">
+      <div class="stat-card">
+        <div class="stat-label">Total dogs</div>
+        <div class="stat-value" id="stat-total">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Done</div>
+        <div class="stat-value green" id="stat-done">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Groomer's cut (60%)</div>
+        <div class="stat-value amber" id="stat-cut">—</div>
+      </div>
+    </div>
+  </div>
+  <div id="loading-grooming"><div class="spinner"></div><p>Loading grooming list…</p></div>
+  <table id="grooming-table" style="display:none;">
+    <thead>
+      <tr>
+        <th>Done</th><th>Name</th><th>Breed</th><th>Service</th><th>Details</th><th>Time</th><th>Value</th>
+      </tr>
+    </thead>
+    <tbody id="grooming-tbody"></tbody>
+  </table>
+  <div id="empty-grooming" style="display:none;">No dogs in the grooming list today</div>
+</div>
+
+<div id="dots"></div>
+<button class="arrow" id="prev">&#8249;</button>
+<button class="arrow" id="next">&#8250;</button>
+<div id="progress-bar"></div>
+
+<script>
+  document.getElementById('store-name').textContent = CONFIG.STORE_NAME;
+
+  function updateClock() {
+    document.getElementById('clock').textContent =
+      new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+  updateClock();
+  setInterval(updateClock, 30000);
+
+  function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach((b, i) => {
+      b.classList.toggle('active', (i === 0 && tab === 'dogs') || (i === 1 && tab === 'grooming'));
+    });
+    document.getElementById('page-dogs').classList.toggle('active', tab === 'dogs');
+    document.getElementById('page-grooming').classList.toggle('active', tab === 'grooming');
+    document.getElementById('dots').style.display = tab === 'dogs' ? 'flex' : 'none';
+    document.getElementById('prev').style.display = tab === 'dogs' ? '' : 'none';
+    document.getElementById('next').style.display = tab === 'dogs' ? '' : 'none';
+    document.getElementById('progress-bar').style.display = tab === 'dogs' ? '' : 'none';
+    document.getElementById('dog-counter').style.display = tab === 'dogs' ? '' : 'none';
+    if (tab === 'grooming') loadGrooming();
+  }
+
+  // DOGS
+  let dogs = [], current = 0, timer = null;
+
+  async function fetchDogs() {
+    try {
+      const res = await fetch(CONFIG.SHEET_API_URL + '?t=' + Date.now());
+      return await res.json();
+    } catch(e) { return null; }
+  }
+
+  function parsedog(row) {
+    return {
+      name: row[CONFIG.COLUMNS.name] || 'Unknown',
+      photo: row[CONFIG.COLUMNS.photo] || '',
+      breed: row[CONFIG.COLUMNS.breed] || '',
+      type: row[CONFIG.COLUMNS.type] || '',
+      checkout: row[CONFIG.COLUMNS.checkout] || '',
+      id: row[CONFIG.COLUMNS.id] || ''
+    };
+  }
+
+  function buildSlides(dogList) {
+    const slideshow = document.getElementById('slideshow');
+    const dots = document.getElementById('dots');
+    document.getElementById('loading-dogs').style.display = 'none';
+    slideshow.innerHTML = '';
+    dots.innerHTML = '';
+
+    if (dogList.length === 0) {
+      const empty = document.getElementById('empty-dogs');
+      slideshow.appendChild(empty);
+      empty.style.display = 'flex';
+      document.getElementById('prev').style.display = 'none';
+      document.getElementById('next').style.display = 'none';
+      document.getElementById('dog-counter').textContent = '';
+      return;
+    }
+
+    document.getElementById('prev').style.display = '';
+    document.getElementById('next').style.display = '';
+    document.getElementById('dog-counter').textContent =
+      dogList.length + (dogList.length === 1 ? ' guest' : ' guests') + ' today';
+
+    dogList.forEach((dog, i) => {
+      const slide = document.createElement('div');
+      slide.className = 'slide' + (i === 0 ? ' active' : '');
+
+      const isBoarding = !dog.checkout || (() => {
+        const c = new Date(dog.checkout), t = new Date();
+        t.setHours(0,0,0,0); c.setHours(0,0,0,0); return c > t;
+      })();
+
+      const checkoutLabel = dog.checkout
+        ? 'Checkout: ' + new Date(dog.checkout).toLocaleDateString([], { month: 'short', day: 'numeric' })
+        : 'Still Boarding';
+
+      const photoHtml = dog.photo
+        ? `<img class="dog-photo" src="${dog.photo}" alt="${dog.name}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="dog-photo-placeholder" style="display:none">🐶</div>`
+        : `<div class="dog-photo-placeholder">🐶</div>`;
+
+      slide.innerHTML = `
+        <div class="slide-bg" style="background-image:url('${dog.photo || ''}')"></div>
+        <div class="card">
+          ${photoHtml}
+          <div class="dog-name">${dog.name}</div>
+          <div class="dog-breed">${dog.breed}</div>
+          <div class="badges">
+            ${dog.type ? `<span class="badge badge-type">${dog.type}</span>` : ''}
+            <span class="badge ${isBoarding ? 'badge-boarding' : 'badge-checkout'}">${checkoutLabel}</span>
+          </div>
+        </div>`;
+      slideshow.appendChild(slide);
+
+      const dot = document.createElement('div');
+      dot.className = 'dot' + (i === 0 ? ' active' : '');
+      dot.addEventListener('click', () => goTo(i));
+      dots.appendChild(dot);
+    });
+  }
+
+  function goTo(index) {
+    if (dogs.length === 0) return;
+    const slides = document.querySelectorAll('.slide');
+    const dotEls = document.querySelectorAll('.dot');
+    slides[current]?.classList.remove('active');
+    dotEls[current]?.classList.remove('active');
+    current = (index + dogs.length) % dogs.length;
+    if (current === 0) loadAndRender();
+    slides[current]?.classList.add('active');
+    dotEls[current]?.classList.add('active');
+    resetTimer();
+  }
+
+  function resetTimer() {
+    clearInterval(timer);
+    const bar = document.getElementById('progress-bar');
+    bar.style.transition = 'none'; bar.style.width = '0%';
+    requestAnimationFrame(() => {
+      bar.style.transition = `width ${CONFIG.SLIDE_DURATION}s linear`;
+      bar.style.width = '100%';
+    });
+    timer = setInterval(() => goTo(current + 1), CONFIG.SLIDE_DURATION * 1000);
+  }
+
+  document.getElementById('prev').addEventListener('click', () => goTo(current - 1));
+  document.getElementById('next').addEventListener('click', () => goTo(current + 1));
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowLeft') goTo(current - 1);
+    if (e.key === 'ArrowRight') goTo(current + 1);
+  });
+
+  async function loadAndRender() {
+    const raw = await fetchDogs();
+    if (!raw) return;
+    const rows = Array.isArray(raw[0]) ? raw : [raw];
+    const filtered = rows.filter(row => {
+      if (!row[CONFIG.COLUMNS.name] || String(row[CONFIG.COLUMNS.name]).trim() === '') return false;
+      const checkoutVal = row[CONFIG.COLUMNS.checkout];
+      if (!checkoutVal) return true;
+      const checkout = new Date(checkoutVal);
+      const today = new Date();
+      return checkout.getFullYear() >= today.getFullYear() &&
+             checkout.getMonth() >= today.getMonth() &&
+             checkout.getDate() >= today.getDate();
+    }).map(parsedog);
+    dogs = filtered;
+    buildSlides(dogs);
+    if (dogs.length > 0) { current = 0; resetTimer(); }
+  }
+
+  loadAndRender();
+  setInterval(loadAndRender, CONFIG.REFRESH_INTERVAL * 60 * 1000);
+
+  // GROOMING
+  let groomingData = [];
+
+  async function loadGrooming() {
+    document.getElementById('loading-grooming').style.display = 'block';
+    document.getElementById('grooming-table').style.display = 'none';
+    document.getElementById('empty-grooming').style.display = 'none';
+    try {
+      const res = await fetch(CONFIG.SHEET_API_URL + '?action=grooming&t=' + Date.now());
+      groomingData = await res.json();
+    } catch(e) { groomingData = []; }
+    document.getElementById('loading-grooming').style.display = 'none';
+    renderGrooming();
+  }
+
+  function renderGrooming() {
+    const tbody = document.getElementById('grooming-tbody');
+    tbody.innerHTML = '';
+    if (groomingData.length === 0) {
+      document.getElementById('empty-grooming').style.display = 'block';
+      document.getElementById('grooming-table').style.display = 'none';
+      updateGroomingStats([]);
+      return;
+    }
+    document.getElementById('grooming-table').style.display = 'table';
+    groomingData.forEach(dog => {
+      const tr = document.createElement('tr');
+      tr.className = 'grooming-row' + (dog.done ? ' done' : '');
+      const value = parseFloat(String(dog.value).replace(/[^0-9.]/g, '')) || 0;
+      tr.innerHTML = `
+        <td><button class="check-btn ${dog.done ? 'checked' : ''}" onclick="toggleDone(${dog.index}, ${!dog.done})">✓</button></td>
+        <td><strong>${dog.name}</strong></td>
+        <td style="color:rgba(255,255,255,0.65)">${dog.breed || '—'}</td>
+        <td>${dog.service || '—'}</td>
+        <td style="color:rgba(255,255,255,0.5);font-size:13px">${dog.details || '—'}</td>
+        <td style="color:rgba(255,255,255,0.65)">${dog.time || '—'}</td>
+        <td class="value-cell">$${value.toFixed(2)}</td>`;
+      tbody.appendChild(tr);
+    });
+    updateGroomingStats(groomingData);
+  }
+
+  function updateGroomingStats(data) {
+    const total = data.length;
+    const done = data.filter(d => d.done).length;
+    const totalValue = data.reduce((sum, d) => sum + (parseFloat(String(d.value).replace(/[^0-9.]/g, '')) || 0), 0);
+    document.getElementById('stat-total').textContent = total;
+    document.getElementById('stat-done').textContent = done + '/' + total;
+    document.getElementById('stat-cut').textContent = '$' + (totalValue * 0.6).toFixed(2);
+  }
+
+  async function toggleDone(rowIndex, newState) {
+    const idx = groomingData.findIndex(d => d.index === rowIndex);
+    if (idx === -1) return;
+    groomingData[idx].done = newState;
+    renderGrooming();
+    try {
+      await fetch(`${CONFIG.SHEET_API_URL}?action=updateGrooming&row=${rowIndex}&done=${newState}&t=${Date.now()}`);
+    } catch(e) { console.error('Failed to save:', e); }
+  }
+</script>
+</body>
+</html>
