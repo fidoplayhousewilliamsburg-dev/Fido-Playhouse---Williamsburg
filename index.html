@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Fido Playhouse - Williamsburg</title>
+<link href="https://fonts.googleapis.com/css2?family=Righteous&family=Lato:wght@300;400;700&display=swap" rel="stylesheet"/>
+<style>
+:root{--bp:#4C82A8;--bl:#AFCDD7;--bd:#2E5665;--bx:#1a3d4f;--ow:#F6F7F0;--or:#D76B00;--mu:rgba(246,247,240,.5);--br:rgba(175,205,215,.18)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bx);font-family:'Lato',sans-serif;color:var(--ow);height:100vh;overflow:hidden}
+/* NAV */
+#nav{position:fixed;top:0;left:0;right:0;height:62px;display:flex;align-items:center;justify-content:space-between;padding:0 32px;background:rgba(26,61,79,.98);border-bottom:1px solid var(--br);z-index:200}
+#sname{font-family:'Righteous',sans-serif;font-size:16px;letter-spacing:1px;display:flex;align-items:center;gap:10px}
+#sname .dot{width:8px;height:8px;border-radius:50%;background:var(--or)}
+#sname .sub{font-family:'Lato',sans-serif;font-size:10px;font-weight:300;letter-spacing:2px;color:var(--bl);text-transform:uppercase}
+#tabs{display:flex;background:rgba(44,86,101,.6);border:1px solid var(--br);border-radius:10px;padding:4px;gap:4px}
+.tab{padding:7px 18px;border-radius:7px;border:none;background:transparent;color:var(--mu);font-family:'Lato',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:.2s}
+.tab.on{background:var(--bp);color:var(--ow)}
+#clk{font-size:13px;font-weight:300;color:var(--bl);letter-spacing:1px;min-width:60px;text-align:right}
+/* PAGES */
+.page{position:fixed;inset:62px 0 0 0;opacity:0;pointer-events:none;transition:opacity .4s}
+.page.on{opacity:1;pointer-events:auto}
+/* DOGS */
+#pdogs{overflow:hidden}
+#slideshow{width:100%;height:100%;position:relative;display:flex;align-items:center;justify-content:center}
+.slide{position:absolute;inset:0;opacity:0;transition:opacity 1s;pointer-events:none}
+.slide.on{opacity:1;pointer-events:auto}
+.sbg{position:absolute;inset:0;background-size:cover;background-position:center}
+.sbg::before{content:'';position:absolute;inset:0;background:linear-gradient(to bottom,rgba(26,61,79,.1) 0%,transparent 35%,transparent 45%,rgba(26,61,79,.65) 70%,rgba(26,61,79,.97) 100%)}
+.sinfo{position:absolute;bottom:0;left:0;right:0;padding:0 48px 52px;z-index:2}
+.sname{font-family:'Righteous',sans-serif;font-size:64px;line-height:1;letter-spacing:-1px;margin-bottom:8px}
+.sbreed{font-size:18px;font-weight:300;color:var(--bl);letter-spacing:1px;text-transform:uppercase;margin-bottom:16px}
+.sbadges{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.badge{font-size:11px;font-weight:700;padding:6px 16px;border-radius:100px;letter-spacing:.8px;text-transform:uppercase}
+.bt{background:rgba(76,130,168,.3);color:var(--bl);border:1px solid rgba(175,205,215,.35)}
+.bc{background:rgba(215,107,0,.2);color:#f0a060;border:1px solid rgba(215,107,0,.35)}
+.bb{background:rgba(175,205,215,.15);color:var(--bl);border:1px solid rgba(175,205,215,.3)}
+.sextras{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.etag{font-size:11px;font-weight:700;padding:5px 12px;border-radius:100px;background:rgba(215,107,0,.25);color:#f0a060;border:1px solid rgba(215,107,0,.35)}
+.addbtn{position:absolute;top:76px;right:20px;z-index:5;width:42px;height:42px;border-radius:50%;background:rgba(76,130,168,.35);border:1.5px solid rgba(175,205,215,.3);color:var(--ow);font-size:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.2s}
+.addbtn:hover{background:var(--bp)}
+#ctr{position:fixed;top:74px;right:18px;background:rgba(26,61,79,.8);border:1px solid var(--br);border-radius:100px;padding:5px 14px;font-size:11px;font-weight:700;color:var(--bl);z-index:150;letter-spacing:.5px;text-transform:uppercase}
+#dots{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);display:flex;gap:7px;z-index:150}
+.dot{height:6px;width:6px;border-radius:3px;background:rgba(175,205,215,.3);cursor:pointer;transition:.3s}
+.dot.on{background:var(--or);width:22px}
+.arr{position:fixed;top:50%;transform:translateY(-50%);z-index:150;background:rgba(26,61,79,.7);border:1px solid rgba(175,205,215,.2);color:var(--bl);font-size:22px;width:44px;height:44px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.2s}
+.arr:hover{background:var(--bp);color:var(--ow)}
+#pbar{position:fixed;bottom:0;left:0;height:3px;background:var(--or);transition:width linear;z-index:200}
+#empty{display:none;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:16px;text-align:center;background:var(--bx)}
+#empty h2{font-family:'Righteous',sans-serif;font-size:26px}
+#empty p{color:var(--mu);font-size:15px}
+.spin{width:30px;height:30px;border:2px solid rgba(175,205,215,.2);border-top-color:var(--bp);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 12px}
+@keyframes sp{to{transform:rotate(360deg)}}
+/* GROOMING */
+#pgroom{overflow-y:auto;padding:24px 32px;background:var(--bx)}
+#gtop{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px}
+#gtop h2{font-family:'Righteous',sans-serif;font-size:20px}
+#gstats{display:flex;gap:10px;flex-wrap:wrap}
+.sc{background:rgba(76,130,168,.15);border:1px solid var(--br);border-radius:12px;padding:10px 18px;min-width:100px}
+.sl{font-size:10px;font-weight:700;color:var(--bl);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
+.sv{font-family:'Righteous',sans-serif;font-size:22px}
+.sv.bl{color:var(--bl)}.sv.or{color:var(--or)}
+.gtw{background:rgba(44,86,101,.35);border:1px solid var(--br);border-radius:14px;overflow:hidden}
+table{width:100%;border-collapse:collapse}
+thead tr{border-bottom:1px solid var(--br)}
+th{text-align:left;font-size:10px;font-weight:700;color:var(--bl);text-transform:uppercase;letter-spacing:1px;padding:12px 18px}
+td{padding:14px 18px;font-size:14px;border-bottom:1px solid rgba(175,205,215,.06);vertical-align:middle}
+tbody tr:hover{background:rgba(76,130,168,.08)}
+tbody tr.done td{opacity:.35;text-decoration:line-through}
+tbody tr.done td:first-child{opacity:1;text-decoration:none}
+.chk{width:28px;height:28px;border-radius:50%;border:1.5px solid rgba(175,205,215,.3);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;color:transparent;transition:.2s}
+.chk.on{background:var(--bp);border-color:var(--bp);color:#fff}
+.tpill{display:inline-block;background:rgba(76,130,168,.2);border:1px solid var(--br);border-radius:6px;padding:2px 9px;font-size:12px;font-weight:700;color:var(--bl)}
+.val{color:var(--or);font-weight:700}
+/* Mobile cards */
+.mcards{display:none}
+.mcard{background:rgba(44,86,101,.35);border:1px solid var(--br);border-radius:12px;padding:14px;margin-bottom:10px}
+.mcard.done{opacity:.38}
+.mch{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.mcn{font-family:'Righteous',sans-serif;font-size:17px}
+.mcb{font-size:12px;color:var(--mu);margin-top:2px}
+.mcr{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-top:1px solid rgba(175,205,215,.06);font-size:13px}
+.mcrl{color:var(--mu);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px}
+/* Services overlay */
+#soverlay{display:none;position:fixed;inset:0;background:rgba(10,28,38,.85);z-index:300;align-items:center;justify-content:center}
+#soverlay.on{display:flex}
+#spanel{background:var(--bd);border:1px solid rgba(175,205,215,.25);border-radius:20px;padding:26px;width:90%;max-width:400px;max-height:85vh;overflow-y:auto}
+#stitle{font-family:'Righteous',sans-serif;font-size:18px;margin-bottom:4px}
+#ssub{font-size:13px;color:var(--mu);margin-bottom:18px}
+.svc{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-radius:10px;background:rgba(76,130,168,.12);border:1px solid rgba(175,205,215,.1);margin-bottom:8px;cursor:pointer;transition:.2s;user-select:none}
+.svc:hover{background:rgba(76,130,168,.25)}
+.svc.on{background:rgba(76,130,168,.35);border-color:var(--bp)}
+.svcl{display:flex;align-items:center;gap:10px}
+.svcc{width:20px;height:20px;border-radius:50%;border:1.5px solid rgba(175,205,215,.3);display:flex;align-items:center;justify-content:center;font-size:11px;color:transparent;transition:.2s;flex-shrink:0}
+.svc.on .svcc{background:var(--bp);border-color:var(--bp);color:#fff}
+.svcn{font-size:14px;font-weight:700}
+.svcp{font-family:'Righteous',sans-serif;font-size:14px;color:var(--or)}
+.dbadge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:100px;letter-spacing:.4px;text-transform:uppercase;margin-left:5px}
+.dl{background:rgba(215,107,0,.2);color:#f0a060;border:1px solid rgba(215,107,0,.3)}
+.ds{background:rgba(76,175,125,.2);color:#7FD4A8;border:1px solid rgba(76,175,125,.3)}
+#sacts{display:flex;gap:10px;margin-top:18px}
+.bcnl{flex:1;padding:11px;border-radius:10px;border:1px solid rgba(175,205,215,.2);background:transparent;color:var(--mu);font-family:'Lato',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:.2s}
+.bcnl:hover{color:var(--ow)}
+.bcon{flex:2;padding:11px;border-radius:10px;border:none;background:var(--bp);color:var(--ow);font-family:'Righteous',sans-serif;font-size:14px;cursor:pointer;transition:.2s}
+.bcon:hover{background:#5a92b8}
+#dlabel{text-align:center;padding:10px;color:var(--mu);font-size:13px;display:none}
+/* DROP OFF */
+.grp{background:rgba(44,86,101,.35);border:1px solid var(--br);border-radius:14px;padding:18px;margin-bottom:16px}
+.grph{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.grplbl{font-family:'Righteous',sans-serif;font-size:18px;color:var(--ow)}
+.grpbdg{font-size:11px;font-weight:700;padding:4px 12px;border-radius:100px;letter-spacing:.5px;text-transform:uppercase}
+.grpA{background:rgba(76,130,168,.3);color:var(--bl);border:1px solid rgba(76,130,168,.4)}
+.grpB{background:rgba(215,107,0,.25);color:#f0a060;border:1px solid rgba(215,107,0,.35)}
+.grpC{background:rgba(76,175,125,.2);color:#7FD4A8;border:1px solid rgba(76,175,125,.3)}
+.grpD{background:rgba(175,100,175,.2);color:#d4a0d4;border:1px solid rgba(175,100,175,.3)}
+.grpE{background:rgba(200,180,50,.2);color:#d4c060;border:1px solid rgba(200,180,50,.3)}
+.stop{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid rgba(175,205,215,.06)}
+.stop:last-child{border-bottom:none}
+.stopnum{width:26px;height:26px;border-radius:50%;background:var(--bp);color:var(--ow);font-family:'Righteous',sans-serif;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.stopnum.home{background:var(--or)}
+.stopinfo{flex:1}
+.stopname{font-weight:700;font-size:14px}
+.stopaddr{font-size:12px;color:var(--mu);margin-top:2px}
+.mapl{display:inline-flex;align-items:center;gap:5px;margin-top:10px;padding:7px 14px;border-radius:8px;background:rgba(76,130,168,.2);border:1px solid rgba(175,205,215,.2);color:var(--bl);font-size:12px;font-weight:700;text-decoration:none;letter-spacing:.3px;transition:.2s}
+.mapl:hover{background:var(--bp);color:var(--ow)}
+.gcalc{text-align:center;padding:20px;color:var(--mu);font-size:13px}
+@media(max-width:640px){#pdrop-inner{padding:16px}}
+@media(max-width:640px){
+  #pgroom{padding:16px}
+  #gtop{flex-direction:column}
+  #gstats{width:100%;justify-content:space-between}
+  .sc{flex:1;min-width:0;padding:8px 10px;text-align:center}
+  .gtw{display:none!important}
+  .mcards{display:block}
+  .sname{font-size:42px}
+  .sinfo{padding:0 20px 72px}
+  #nav{padding:0 14px}
+  #sname .sub{display:none}
+  .tab{padding:6px 11px;font-size:12px}
+  .arr{width:34px;height:34px;font-size:18px}
+  #prev{left:6px}#next{right:6px}
+}
+</style>
+</head>
+<body>
+
+<script>
+const C={
+  API:"https://script.google.com/macros/s/AKfycbzD_dT7oNYz8kto7YXCzTliNkIRpOMGPSyfakpC0H76qNfEVr90fFGPohxY2Vw3nx04/exec",
+  DUR:7, REF:30,
+  STORE:"420 Kent Ave, Brooklyn, NY 11249",
+  COL:{name:0,photo:1,breed:2,type:3,checkout:4,id:5,addr:6,apt:7,owner:8}
+};
+const SVCS=[
+  {id:'ds',n:'Drop off (Short)',p:10,grp:'drop'},
+  {id:'dl',n:'Drop off (Long)', p:16,grp:'drop'},
+  {id:'ps',n:'Pick up (Short)', p:10,grp:'pick'},
+  {id:'pl',n:'Pick up (Long)',  p:16,grp:'pick'},
+  {id:'hf',n:'Holiday Fee',     p:40,grp:'other'},
+  {id:'fd',n:'House Food',      p:4, grp:'other'},
+  {id:'nt',n:'Nail Trimming',   p:15,grp:'other'},
+];
+</script>
+
+<div id="nav">
+  <div id="sname">
+    <div class="dot"></div>
+    <div><span>FIDO PLAYHOUSE</span><div class="sub">Williamsburg</div></div>
+  </div>
+  <div id="tabs">
+    <button class="tab on" onclick="setTab('dogs')">🐶 Dogs Today</button>
+    <button class="tab" onclick="setTab('groom')">✂️ Grooming</button>
+    <button class="tab" onclick="setTab('drop')">🚗 Drop off</button>
+  </div>
+  <div id="clk"></div>
+</div>
+
+<div id="ctr"></div>
+
+<div id="pdogs" class="page on">
+  <div id="slideshow">
+    <div id="ldogs" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%">
+      <div class="spin"></div>
+      <p style="color:var(--mu);font-size:14px;letter-spacing:1px">Loading guests…</p>
+    </div>
+    <div id="empty">
+      <div style="font-size:52px">🐾</div>
+      <h2>No guests right now</h2>
+      <p>New check-ins appear automatically</p>
+    </div>
+  </div>
+</div>
+
+<div id="pgroom" class="page">
+  <div id="gtop">
+    <h2>✂️ GROOMING & BATH</h2>
+    <div id="gstats">
+      <div class="sc"><div class="sl">Total</div><div class="sv" id="gtot">—</div></div>
+      <div class="sc"><div class="sl">Done</div><div class="sv bl" id="gdone">—</div></div>
+      <div class="sc"><div class="sl">Groomer 60%</div><div class="sv or" id="gcut">—</div></div>
+    </div>
+  </div>
+  <div id="glod" style="text-align:center;padding:60px"><div class="spin"></div><p style="color:var(--mu)">Loading…</p></div>
+  <div class="gtw" id="gtbl" style="display:none">
+    <table><thead><tr><th>Done</th><th>Name</th><th>Breed</th><th>Service</th><th>Details</th><th>Time</th><th>Value</th></tr></thead>
+    <tbody id="gtbody"></tbody></table>
+  </div>
+  <div class="mcards" id="mcards"></div>
+  <div id="gempty" style="display:none;text-align:center;padding:60px;color:var(--mu)">No dogs in grooming list</div>
+</div>
+
+<div id="pdrop" class="page">
+  <div id="pdrop-inner" style="overflow-y:auto;height:100%;padding:24px 32px;background:var(--bx)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px">
+      <h2 style="font-family:'Righteous',sans-serif;font-size:20px">🚗 DROP OFF GROUPS</h2>
+      <div style="font-size:12px;color:var(--mu);font-weight:700;letter-spacing:.5px">Starting & ending at 420 Kent Ave</div>
+    </div>
+    <div id="dgroups"></div>
+    <div id="dempty" style="display:none;text-align:center;padding:80px 20px;color:var(--mu)">
+      <div style="font-size:48px;margin-bottom:16px">🚗</div>
+      <p style="font-size:15px">No drop offs added yet.<br>Use the + button on each dog's slide.</p>
+    </div>
+  </div>
+</div>
+<div id="dots"></div>
+<button class="arr" id="prev">&#8249;</button>
+<button class="arr" id="next">&#8250;</button>
+<div id="pbar"></div>
+
+<div id="soverlay">
+  <div id="spanel">
+    <div id="stitle">Add Services</div>
+    <div id="ssub"></div>
+    <div id="dlabel">⏳ Checking distance…</div>
+    <div id="slist"></div>
+    <div id="sacts">
+      <button class="bcnl" onclick="closeSvc()">Cancel</button>
+      <button class="bcon" onclick="confirmSvc()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Clock ──
+function tick(){document.getElementById('clk').textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}
+tick(); setInterval(tick,30000);
+
+// ── Tabs ──
+function setTab(t){
+  ['dogs','groom','drop'].forEach((x,i)=>{
+    document.getElementById('p'+x).classList.toggle('on',x===t);
+    document.querySelectorAll('.tab')[i].classList.toggle('on',x===t);
+  });
+  ['dots','prev','next','pbar','ctr'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.style.display=t==='dogs'?'':'none';
+  });
+  if(t==='groom') loadGroom();
+  if(t==='drop') renderDrop();
+}
+
+// ── DOGS ──
+let dogs=[],cur=0,timer=null,sig='';
+
+function parseVal(v){return parseFloat(String(v).replace(/[^\d.,]/g,'').replace(',','.'))||0}
+function fmtTime(v){if(!v)return'—';const d=new Date(v);return isNaN(d)?String(v):d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:true})}
+
+async function fetchDogs(){
+  try{const r=await fetch(C.API+'?t='+Date.now());return await r.json()}catch{return null}
+}
+
+function parsedog(row){
+  return{
+    name:String(row[C.COL.name]||'Unknown'),
+    photo:String(row[C.COL.photo]||''),
+    breed:String(row[C.COL.breed]||''),
+    type:String(row[C.COL.type]||''),
+    checkout:row[C.COL.checkout]||'',
+    id:row[C.COL.id]||'',
+    addr:String(row[C.COL.addr]||''),
+    apt:String(row[C.COL.apt]||''),
+    owner:String(row[C.COL.owner]||''),
+    extras:[]
+  };
+}
+
+function buildSlides(list){
+  const ss=document.getElementById('slideshow');
+  const dt=document.getElementById('dots');
+  document.getElementById('ldogs').style.display='none';
+  document.querySelectorAll('.slide').forEach(s=>s.remove());
+  dt.innerHTML='';
+
+  if(!list.length){
+    document.getElementById('empty').style.display='flex';
+    document.getElementById('prev').style.display='none';
+    document.getElementById('next').style.display='none';
+    document.getElementById('ctr').textContent='';
+    return;
+  }
+  document.getElementById('empty').style.display='none';
+  document.getElementById('prev').style.display='';
+  document.getElementById('next').style.display='';
+  document.getElementById('ctr').textContent=list.length+(list.length===1?' GUEST TODAY':' GUESTS TODAY');
+
+  list.forEach((dog,i)=>{
+    const today=new Date(); today.setHours(0,0,0,0);
+    const co=dog.checkout?new Date(dog.checkout):null;
+    if(co) co.setHours(0,0,0,0);
+    const boarding=!co||co>today;
+    const colabel=co?'Checkout '+co.toLocaleDateString([],{month:'short',day:'numeric'}):'Still Boarding';
+    const bg=dog.photo?`background-image:url('${dog.photo}')`:`background:linear-gradient(135deg,var(--bd),var(--bx))`;
+
+    const sl=document.createElement('div');
+    sl.className='slide'+(i===0?' on':'');
+    sl.innerHTML=`
+      <div class="sbg" style="${bg}"></div>
+      <button class="addbtn" onclick="openSvc(${i})">+</button>
+      <div class="sinfo">
+        <div class="sname">${dog.name}</div>
+        <div class="sbreed">${dog.breed}</div>
+        <div class="sbadges">
+          ${dog.type?`<span class="badge bt">${dog.type}</span>`:''}
+          <span class="badge ${boarding?'bb':'bc'}">${colabel}</span>
+        </div>
+        <div class="sextras" id="ex${i}">${(dog.extras||[]).map(x=>`<span class="etag">${x.n.replace(' (Short)','').replace(' (Long)','')}${x.p>0?' $'+x.p:''}</span>`).join('')}</div>
+      </div>`;
+    ss.appendChild(sl);
+
+    const dot=document.createElement('div');
+    dot.className='dot'+(i===0?' on':'');
+    dot.onclick=()=>goTo(i);
+    dt.appendChild(dot);
+  });
+}
+
+function goTo(i){
+  if(!dogs.length) return;
+  document.querySelectorAll('.slide')[cur]?.classList.remove('on');
+  document.querySelectorAll('.dot')[cur]?.classList.remove('on');
+  cur=(i+dogs.length)%dogs.length;
+  document.querySelectorAll('.slide')[cur]?.classList.add('on');
+  document.querySelectorAll('.dot')[cur]?.classList.add('on');
+  resetTimer();
+}
+
+function resetTimer(){
+  clearInterval(timer);
+  const b=document.getElementById('pbar');
+  b.style.transition='none'; b.style.width='0%';
+  requestAnimationFrame(()=>{b.style.transition=`width ${C.DUR}s linear`;b.style.width='100%'});
+  timer=setInterval(()=>goTo(cur+1),C.DUR*1000);
+}
+
+document.getElementById('prev').onclick=()=>goTo(cur-1);
+document.getElementById('next').onclick=()=>goTo(cur+1);
+document.addEventListener('keydown',e=>{if(e.key==='ArrowLeft')goTo(cur-1);if(e.key==='ArrowRight')goTo(cur+1)});
+
+function preload(list){list.forEach(d=>{if(d.photo){const i=new Image();i.src=d.photo}})}
+
+async function loadDogs(){
+  const raw=await fetchDogs();
+  if(!raw) return;
+  const rows=Array.isArray(raw[0])?raw:[raw];
+  const today=new Date(); today.setHours(0,0,0,0);
+  const filtered=rows.filter(r=>{
+    if(!r[C.COL.name]||!String(r[C.COL.name]).trim()) return false;
+    const co=r[C.COL.checkout];
+    if(!co) return true;
+    const d=new Date(co); d.setHours(0,0,0,0);
+    return d>=today;
+  }).map(parsedog);
+
+  const newSig='v:'+filtered.map(d=>d.name+d.id).join('|');
+  if(newSig===sig) return;
+  sig=newSig;
+
+  const prevName=dogs[cur]?.name||'';
+  dogs=filtered;
+  pruneExtras(dogs);
+  dogs.forEach(loadExtras);
+  preload(dogs);
+  buildSlides(dogs);
+  if(dogs.length){
+    const ri=dogs.findIndex(d=>d.name===prevName);
+    cur=ri>=0?ri:0;
+    document.querySelectorAll('.slide').forEach((s,i)=>s.classList.toggle('on',i===cur));
+    document.querySelectorAll('.dot').forEach((d,i)=>d.classList.toggle('on',i===cur));
+    resetTimer();
+  }
+}
+
+loadDogs();
+setInterval(loadDogs,C.REF*1000);
+
+// ── SERVICES ──
+let svcDog=-1,selSvcs=[],isLong=null,wasPaused=false;
+
+async function distCheck(addr,apt){
+  if(!addr) return false;
+  try{
+    // Step 1: Geocode the dog's address using Nominatim
+    const queries=[
+      addr+(apt?', '+apt:'')+', Brooklyn, NY 11249',
+      addr+', Brooklyn, NY',
+      addr+', New York, NY'
+    ];
+    let dlat=null,dlon=null;
+    for(const q of queries){
+      const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`);
+      const d=await r.json();
+      if(d.length){dlat=parseFloat(d[0].lat);dlon=parseFloat(d[0].lon);break;}
+    }
+    if(dlat===null) return false;
+
+    // Step 2: Get real walking time via OSRM (free, no API key needed)
+    // Store coords: 40.7110, -73.9709 (420 Kent Ave)
+    const slat=40.7110,slon=-73.9709;
+    const osrm=await fetch(`https://router.project-osrm.org/route/v1/foot/${slon},${slat};${dlon},${dlat}?overview=false`);
+    const od=await osrm.json();
+    if(od.code==='Ok'&&od.routes?.length){
+      const minutes=od.routes[0].duration/60;
+      return minutes>10; // true=Long, false=Short
+    }
+  }catch{}
+  return false;
+}
+
+async function openSvc(i){
+  svcDog=i; selSvcs=[...(dogs[i].extras||[])];
+  clearInterval(timer);
+  document.getElementById('pbar').style.transition='none';
+  wasPaused=true;
+  document.getElementById('stitle').textContent='Add Services — '+dogs[i].name;
+  document.getElementById('ssub').textContent=dogs[i].owner?'Owner: '+dogs[i].owner:'';
+  document.getElementById('soverlay').classList.add('on');
+  isLong=false;
+  if(dogs[i].addr){
+    document.getElementById('dlabel').style.display='block';
+    isLong=await distCheck(dogs[i].addr,dogs[i].apt);
+    document.getElementById('dlabel').style.display='none';
+  }
+  renderSvcs();
+}
+
+function renderSvcs(){
+  const el=document.getElementById('slist');
+  el.innerHTML='';
+  SVCS.forEach(s=>{
+    // Show only the correct tier for drop/pick — system decides, user never chooses
+    if(s.grp==='drop'||s.grp==='pick'){
+      if(isLong&&s.id.endsWith('s')) return;
+      if(!isLong&&s.id.endsWith('l')) return;
+    }
+    const on=selSvcs.some(x=>x.id===s.id);
+    const label=s.n.replace(' (Short)','').replace(' (Long)','');
+    const div=document.createElement('div');
+    div.className='svc'+(on?' on':'');
+    div.innerHTML=`<div class="svcl"><div class="svcc">✓</div><span class="svcn">${label}</span></div><span class="svcp">${s.p>0?'$'+s.p:'Custom'}</span>`;
+    div.onclick=()=>{
+      const idx=selSvcs.findIndex(x=>x.id===s.id);
+      idx>=0?selSvcs.splice(idx,1):selSvcs.push(s);
+      renderSvcs();
+    };
+    el.appendChild(div);
+  });
+}
+
+function confirmSvc(){
+  if(svcDog>=0){
+    dogs[svcDog].extras=[...selSvcs];
+    saveExtras(dogs[svcDog]);
+    const el=document.getElementById('ex'+svcDog);
+    if(el) el.innerHTML=selSvcs.map(s=>`<span class="etag">${s.n.replace(' (Short)','').replace(' (Long)','')}${s.p>0?' $'+s.p:''}</span>`).join('');
+  }
+  closeSvc();
+  // Recalculate drop off groups if drop tab is active
+  if(document.getElementById('pdrop').classList.contains('on')) renderDrop();
+}
+
+function extrasKey(dog){return'extras_'+String(dog.id||dog.name).replace(/\s+/g,'_')}
+function saveExtras(dog){localStorage.setItem(extrasKey(dog),JSON.stringify(dog.extras))}
+function loadExtras(dog){try{const s=localStorage.getItem(extrasKey(dog));if(s)dog.extras=JSON.parse(s);}catch{}}
+function pruneExtras(activeDogs){
+  try{
+    const activeKeys=new Set(activeDogs.map(extrasKey));
+    Object.keys(localStorage).forEach(k=>{if(k.startsWith('extras_')&&!activeKeys.has(k))localStorage.removeItem(k)});
+  }catch{}
+}
+
+const STORE_LL=[40.7110,-73.9709];
+const GRP_LABELS=['A','B','C','D','E','F','G','H'];
+
+function haversine([la1,lo1],[la2,lo2]){
+  const R=6371000,dL=(la2-la1)*Math.PI/180,dO=(lo2-lo1)*Math.PI/180;
+  const a=Math.sin(dL/2)**2+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dO/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+// Nearest-neighbor TSP starting from store
+function optimizeRoute(stops){
+  if(!stops.length) return [];
+  let unvisited=[...stops],route=[],cur=STORE_LL;
+  while(unvisited.length){
+    let best=0,bd=Infinity;
+    unvisited.forEach((s,i)=>{const d=haversine(cur,s.ll);if(d<bd){bd=d;best=i}});
+    route.push(unvisited[best]);
+    cur=unvisited[best].ll;
+    unvisited.splice(best,1);
+  }
+  return route;
+}
+
+// Group dogs by proximity — cluster then cap at 5
+function clusterDogs(dogsWithLL){
+  if(!dogsWithLL.length) return [];
+  const groups=[];
+  const used=new Set();
+  dogsWithLL.forEach((d,i)=>{
+    if(used.has(i)) return;
+    const grp=[d]; used.add(i);
+    // Find nearest unassigned dogs to fill group (max 4 more)
+    while(grp.length<5){
+      let best=-1,bd=Infinity;
+      dogsWithLL.forEach((d2,j)=>{
+        if(used.has(j)) return;
+        const dist=haversine(grp[0].ll,d2.ll);
+        if(dist<bd){bd=dist;best=j}
+      });
+      if(best<0||bd>2000) break; // >2km away = new group
+      grp.push(dogsWithLL[best]);
+      used.add(best);
+    }
+    groups.push(grp);
+  });
+  // Ensure min 2 per group — merge small groups
+  for(let i=groups.length-1;i>=0;i--){
+    if(groups[i].length<2&&groups.length>1){
+      const target=i===0?1:0;
+      if(groups[target].length<5){
+        groups[target].push(...groups[i]);
+        groups.splice(i,1);
+      }
+    }
+  }
+  return groups;
+}
+
+async function geocode(addr,apt){
+  try{
+    const q=encodeURIComponent(addr+(apt?', '+apt:'')+', Brooklyn, NY');
+    const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`);
+    const d=await r.json();
+    if(!d.length) return null;
+    return[parseFloat(d[0].lat),parseFloat(d[0].lon)];
+  }catch{return null}
+}
+
+async function renderDrop(){
+  const el=document.getElementById('dgroups');
+  const em=document.getElementById('dempty');
+  // Get all dogs with drop off service
+  const dropDogs=dogs.filter(d=>d.extras?.some(s=>s.grp==='drop'));
+  if(!dropDogs.length){el.innerHTML='';em.style.display='block';return}
+  em.style.display='none';
+  el.innerHTML=`<div class="gcalc"><div class="spin"></div><p>Calculating optimal routes…</p></div>`;
+
+  // Geocode all addresses
+  const withLL=await Promise.all(dropDogs.map(async d=>{
+    const ll=d.addr?await geocode(d.addr,d.apt):null;
+    return{...d,ll:ll||STORE_LL};
+  }));
+
+  const groups=clusterDogs(withLL);
+  el.innerHTML='';
+
+  groups.forEach((grp,gi)=>{
+    const label=GRP_LABELS[gi]||String(gi+1);
+    const route=optimizeRoute(grp);
+    // Build Google Maps URL with waypoints
+    const storeAddr=encodeURIComponent(C.STORE);
+    const wpAddrs=route.map(s=>encodeURIComponent(s.addr+(s.apt?', '+s.apt:'')+', Brooklyn, NY 11249')).join('|');
+    const mapsUrl=`https://www.google.com/maps/dir/?api=1&origin=${storeAddr}&destination=${storeAddr}&waypoints=${wpAddrs}&travelmode=walking`;
+
+    const div=document.createElement('div');
+    div.className='grp';
+    div.innerHTML=`
+      <div class="grph">
+        <span class="grplbl">Group ${label}</span>
+        <span class="grpbdg grp${label}">${grp.length} dog${grp.length>1?'s':''}</span>
+      </div>
+      <div class="stop">
+        <div class="stopnum home">🏠</div>
+        <div class="stopinfo"><div class="stopname">Start — 420 Kent Ave</div></div>
+      </div>
+      ${route.map((s,i)=>`
+        <div class="stop">
+          <div class="stopnum">${i+1}</div>
+          <div class="stopinfo">
+            <div class="stopname">${s.name} <span style="font-weight:300;color:var(--mu);font-size:12px">(${s.breed})</span></div>
+            <div class="stopaddr">${s.addr||'No address'}${s.apt?', '+s.apt:''}</div>
+            ${s.owner?`<div style="font-size:12px;color:var(--bl);margin-top:2px">👤 ${s.owner}</div>`:''}
+          </div>
+          <div style="font-size:11px;font-weight:700;color:var(--or)">${s.extras?.find(e=>e.grp==='drop')?.n?.replace(' (Short)','').replace(' (Long)','')||'Drop off'}</div>
+        </div>`).join('')}
+      <div class="stop">
+        <div class="stopnum home">🏠</div>
+        <div class="stopinfo"><div class="stopname">Return — 420 Kent Ave</div></div>
+      </div>
+      <a class="mapl" href="${mapsUrl}" target="_blank">📍 Open in Google Maps</a>`;
+    el.appendChild(div);
+  });
+}
+
+function closeSvc(){
+  document.getElementById('soverlay').classList.remove('on');
+  svcDog=-1;
+  if(wasPaused){resetTimer();wasPaused=false}
+}
+
+document.getElementById('soverlay').onclick=e=>{if(e.target===document.getElementById('soverlay'))closeSvc()};
+
+// ── GROOMING ──
+let gdata=[];
+
+async function loadGroom(){
+  document.getElementById('glod').style.display='block';
+  document.getElementById('gtbl').style.display='none';
+  document.getElementById('gempty').style.display='none';
+  document.getElementById('mcards').innerHTML='';
+  try{const r=await fetch(C.API+'?action=grooming&t='+Date.now());gdata=await r.json()}catch{gdata=[]}
+  document.getElementById('glod').style.display='none';
+  renderGroom();
+}
+
+function renderGroom(){
+  const tb=document.getElementById('gtbody');
+  const mc=document.getElementById('mcards');
+  tb.innerHTML=''; mc.innerHTML='';
+  if(!gdata.length){
+    document.getElementById('gempty').style.display='block';
+    updStats([]);return;
+  }
+  document.getElementById('gtbl').style.display='block';
+  gdata.forEach(dog=>{
+    const v=parseVal(dog.value),t=fmtTime(dog.time);
+    // Table row
+    const tr=document.createElement('tr');
+    tr.className=dog.done?'done':'';
+    tr.innerHTML=`<td><button class="chk${dog.done?' on':''}" onclick="togDone(${dog.index},${!dog.done})">✓</button></td><td style="font-weight:700">${dog.name}</td><td style="color:var(--mu)">${dog.breed||'—'}</td><td>${dog.service||'—'}</td><td style="color:var(--mu);font-size:13px">${dog.details||'—'}</td><td><span class="tpill">${t}</span></td><td class="val">$${v.toFixed(2)}</td>`;
+    tb.appendChild(tr);
+    // Mobile card
+    const card=document.createElement('div');
+    card.className='mcard'+(dog.done?' done':'');
+    card.innerHTML=`<div class="mch"><div><div class="mcn">${dog.name}</div><div class="mcb">${dog.breed||'—'}</div></div><button class="chk${dog.done?' on':''}" onclick="togDone(${dog.index},${!dog.done})">✓</button></div><div class="mcr"><span class="mcrl">Service</span><span>${dog.service||'—'}</span></div>${dog.details?`<div class="mcr"><span class="mcrl">Details</span><span style="color:var(--mu)">${dog.details}</span></div>`:''}<div class="mcr"><span class="mcrl">Time</span><span class="tpill">${t}</span></div><div class="mcr"><span class="mcrl">Value</span><span class="val">$${v.toFixed(2)}</span></div>`;
+    mc.appendChild(card);
+  });
+  updStats(gdata);
+}
+
+function updStats(d){
+  const tot=d.length,done=d.filter(x=>x.done).length;
+  const total=d.reduce((s,x)=>s+parseVal(x.value),0);
+  document.getElementById('gtot').textContent=tot;
+  document.getElementById('gdone').textContent=done+'/'+tot;
+  document.getElementById('gcut').textContent='$'+(total*.6).toFixed(2);
+}
+
+async function togDone(row,state){
+  const i=gdata.findIndex(d=>d.index===row);
+  if(i<0) return;
+  gdata[i].done=state;
+  renderGroom();
+  try{await fetch(`${C.API}?action=updateGrooming&row=${row}&done=${state}&t=${Date.now()}`)}catch{}
+}
+</script>
+</body>
+</html>
