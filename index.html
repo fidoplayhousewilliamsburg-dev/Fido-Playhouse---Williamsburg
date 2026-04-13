@@ -337,7 +337,11 @@ function buildSlides(list){
 
   // Pair dogs: 2 per slide
   const pairs=[];
-  for(let i=0;i<list.length;i+=2) pairs.push(list.slice(i,i+2));
+for(let i=0;i<list.length;i+=2){
+  const pair=list.slice(i,i+2);
+  if(pair.length===1) pair.push(list[0]);
+  pairs.push(pair);
+}
 
   pairs.forEach((pair,pi)=>{
     const sl=document.createElement('div');
