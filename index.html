@@ -217,6 +217,7 @@ const SVCS=[
   <div class="gtw" id="gtbl" style="display:none">
    <table><thead><tr><th>Done</th><th>Name</th><th>Breed</th><th>Service</th><th>Details</th><th>Time</th><th>Value</th><th>Date</th></tr></thead>
 <tbody id="gtbody"></tbody></table>
+  </div>
   <div class="mcards" id="mcards"></div>
   <div id="gempty" style="display:none;text-align:center;padding:60px;color:var(--mu)">No dogs in grooming list</div>
 </div>
@@ -722,7 +723,7 @@ function renderGroom(){
   const tb=document.getElementById('gtbody');
   const mc=document.getElementById('mcards');
   tb.innerHTML=''; mc.innerHTML='';
-if(!gdata.length){
+  if(!gdata.length){
     document.getElementById('gempty').style.display='block';
     document.getElementById('gempty').textContent='No grooming for today 🐾';
     updStats([]);return;
@@ -730,7 +731,7 @@ if(!gdata.length){
   const today=new Date(); today.setHours(0,0,0,0);
 
   const todayDogs=gdata.filter(d=>{
-    if(!d.date) {return true;
+    if(!d.date) return true;
     const dd=new Date(d.date); dd.setHours(0,0,0,0);
     return dd.getTime()===today.getTime();
   });
@@ -746,6 +747,13 @@ if(!gdata.length){
   });
 
   const sorted=[...todayDogs,...futureDogs];
+
+  if(!sorted.length){
+    document.getElementById('gempty').style.display='block';
+    document.getElementById('gempty').textContent='No grooming for today 🐾';
+    updStats([]);return;
+  }
+
   document.getElementById('gtbl').style.display='block';
 
   sorted.forEach(dog=>{
