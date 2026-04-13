@@ -564,6 +564,10 @@ async function syncExtrasFromAPI(activeDogs){
           dog.extras=JSON.parse(data[key]);
           localStorage.setItem(key,data[key]);
         }catch{}
+      } else {
+        // Não existe no Sheets — limpa local também
+        dog.extras=[];
+        localStorage.removeItem(key);
       }
     });
   }catch{}
