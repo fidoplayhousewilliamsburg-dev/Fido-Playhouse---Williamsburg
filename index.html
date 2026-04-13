@@ -754,7 +754,7 @@ function renderGroom(){
     if(dd) dd.setHours(0,0,0,0);
     const isToday=!dd||dd.getTime()===today.getTime();
     const isFuture=dd&&dd>today;
-    const dateLabel=dd?dd.toLocaleDateString([],{month:'short',day:'numeric'}):'';
+    const dateLabel=dd?dd.toLocaleDateString('pt-BR',{weekday:'short',month:'short',day:'numeric'}):'';
 
     const tr=document.createElement('tr');
     tr.className=dog.done?'done':isFuture?'future':'';
