@@ -69,6 +69,9 @@ td{padding:14px 18px;font-size:14px;border-bottom:1px solid rgba(175,205,215,.06
 tbody tr:hover{background:rgba(76,130,168,.08)}
 tbody tr.done td{opacity:.35;text-decoration:line-through}
 tbody tr.done td:first-child{opacity:1;text-decoration:none}
+  tbody tr.future td{opacity:.55}
+tbody tr.future td:first-child,tbody tr.future td:last-child{opacity:1}
+.mcard.future{opacity:.7;border-left:2px solid rgba(215,107,0,.4)}
 .chk{width:28px;height:28px;border-radius:50%;border:1.5px solid rgba(175,205,215,.3);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;color:transparent;transition:.2s}
 .chk.on{background:var(--bp);border-color:var(--bp);color:#fff}
 .tpill{display:inline-block;background:rgba(76,130,168,.2);border:1px solid var(--br);border-radius:6px;padding:2px 9px;font-size:12px;font-weight:700;color:var(--bl)}
@@ -212,8 +215,7 @@ const SVCS=[
   </div>
   <div id="glod" style="text-align:center;padding:60px"><div class="spin"></div><p style="color:var(--mu)">Loading…</p></div>
   <div class="gtw" id="gtbl" style="display:none">
-    <table><thead><tr><th>Done</th><th>Name</th><th>Breed</th><th>Service</th><th>Details</th><th>Time</th><th>Value</th></tr></thead>
-    <tbody id="gtbody"></tbody></table>
+    <table><thead><tr><<th>Done</th><th>Name</th><th>Breed</th><th>Service</th><th>Details</th><th>Time</th><th>Value</th><th>Date</th>
   </div>
   <div class="mcards" id="mcards"></div>
   <div id="gempty" style="display:none;text-align:center;padding:60px;color:var(--mu)">No dogs in grooming list</div>
@@ -724,21 +726,69 @@ function renderGroom(){
     document.getElementById('gempty').style.display='block';
     updStats([]);return;
   }
+
+  const today=new Date(); today.setHours(0,0,0,0);
+
+  const todayDogs=gdata.filter(d=>{
+    if(!d.date) return true;
+    const dd=new Date(d.date); dd.setHours(0,0,0,0);
+    return dd.getTime()===today.getTime();
+  });
+
+  const futureDogs=gdata.filter(d=>{
+    if(!d.date) return false;
+    const dd=new Date(d.date); dd.setHours(0,0,0,0);
+    return dd>today;
+  }).sort((a,b)=>{
+    const da=new Date(a.date),db=new Date(b.date);
+    if(da-db!==0) return da-db;
+    return String(a.time).localeCompare(String(b.time));
+  });
+
+  const sorted=[...todayDogs,...futureDogs];
   document.getElementById('gtbl').style.display='block';
-  gdata.forEach(dog=>{
+
+  sorted.forEach(dog=>{
     const v=parseVal(dog.value),t=fmtTime(dog.time);
-    // Table row
+    const dd=dog.date?new Date(dog.date):null;
+    if(dd) dd.setHours(0,0,0,0);
+    const isToday=!dd||dd.getTime()===today.getTime();
+    const isFuture=dd&&dd>today;
+    const dateLabel=dd?dd.toLocaleDateString([],{month:'short',day:'numeric'}):'';
+
     const tr=document.createElement('tr');
-    tr.className=dog.done?'done':'';
-    tr.innerHTML=`<td><button class="chk${dog.done?' on':''}" onclick="togDone(${dog.index},${!dog.done})">✓</button></td><td style="font-weight:700">${dog.name}</td><td style="color:var(--mu)">${dog.breed||'—'}</td><td>${dog.service||'—'}</td><td style="color:var(--mu);font-size:13px">${dog.details||'—'}</td><td><span class="tpill">${t}</span></td><td class="val">$${v.toFixed(2)}</td>`;
+    tr.className=dog.done?'done':isFuture?'future':'';
+    tr.innerHTML=`
+      <td><button class="chk${dog.done?' on':''}${!isToday?' disabled':''}"
+        ${isToday?`onclick="togDone(${dog.index},${!dog.done})"`:''}>✓</button></td>
+      <td style="font-weight:700">${dog.name}</td>
+      <td style="color:var(--mu)">${dog.breed||'—'}</td>
+      <td>${dog.service||'—'}</td>
+      <td style="color:var(--mu);font-size:13px">${dog.details||'—'}</td>
+      <td><span class="tpill">${t}</span></td>
+      <td class="val">$${v.toFixed(2)}</td>
+      <td>${isFuture?`<span class="tpill" style="background:rgba(215,107,0,.15);border-color:rgba(215,107,0,.3);color:#f0a060">${dateLabel}</span>`:`<span style="font-size:11px;color:var(--mu)">today</span>`}</td>`;
     tb.appendChild(tr);
-    // Mobile card
+
     const card=document.createElement('div');
-    card.className='mcard'+(dog.done?' done':'');
-    card.innerHTML=`<div class="mch"><div><div class="mcn">${dog.name}</div><div class="mcb">${dog.breed||'—'}</div></div><button class="chk${dog.done?' on':''}" onclick="togDone(${dog.index},${!dog.done})">✓</button></div><div class="mcr"><span class="mcrl">Service</span><span>${dog.service||'—'}</span></div>${dog.details?`<div class="mcr"><span class="mcrl">Details</span><span style="color:var(--mu)">${dog.details}</span></div>`:''}<div class="mcr"><span class="mcrl">Time</span><span class="tpill">${t}</span></div><div class="mcr"><span class="mcrl">Value</span><span class="val">$${v.toFixed(2)}</span></div>`;
+    card.className='mcard'+(dog.done?' done':isFuture?' future':'');
+    card.innerHTML=`
+      <div class="mch">
+        <div>
+          <div class="mcn">${dog.name}</div>
+          <div class="mcb">${dog.breed||'—'}${isFuture?` · <span style="color:#f0a060">${dateLabel}</span>`:''}</div>
+        </div>
+        <button class="chk${dog.done?' on':''}${!isToday?' disabled':''}"
+          ${isToday?`onclick="togDone(${dog.index},${!dog.done})"`:''}>✓</button>
+      </div>
+      <div class="mcr"><span class="mcrl">Service</span><span>${dog.service||'—'}</span></div>
+      ${dog.details?`<div class="mcr"><span class="mcrl">Details</span><span style="color:var(--mu)">${dog.details}</span></div>`:''}
+      <div class="mcr"><span class="mcrl">Time</span><span class="tpill">${t}</span></div>
+      <div class="mcr"><span class="mcrl">Value</span><span class="val">$${v.toFixed(2)}</span></div>`;
     mc.appendChild(card);
   });
-  updStats(gdata);
+
+  updStats(sorted);
 }
 
 function updStats(d){
