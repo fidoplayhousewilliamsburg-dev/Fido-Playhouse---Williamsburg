@@ -722,16 +722,15 @@ function renderGroom(){
   const tb=document.getElementById('gtbody');
   const mc=document.getElementById('mcards');
   tb.innerHTML=''; mc.innerHTML='';
-if(!sorted.length){
-  document.getElementById('gempty').style.display='block';
-  document.getElementById('gempty').textContent='No grooming for today 🐾';
-  updStats([]);return;
- }
-
+if(!gdata.length){
+    document.getElementById('gempty').style.display='block';
+    document.getElementById('gempty').textContent='No grooming for today 🐾';
+    updStats([]);return;
+  }
   const today=new Date(); today.setHours(0,0,0,0);
 
   const todayDogs=gdata.filter(d=>{
-    if(!d.date) return true;
+    if(!d.date) {return true;
     const dd=new Date(d.date); dd.setHours(0,0,0,0);
     return dd.getTime()===today.getTime();
   });
