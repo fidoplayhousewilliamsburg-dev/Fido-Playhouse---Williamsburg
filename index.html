@@ -673,9 +673,23 @@ const preload=list=>('requestIdleCallback' in window?requestIdleCallback:f=>setT
 
 // ── DATA LOADING ──────────────────────────────────────────────────────────
 async function loadDogs(){
+  // Timeout — never hang forever
+  const timeout=new Promise(resolve=>setTimeout(()=>{
+    if($('ldogs').style.display!=='none'){
+      $('ldogs').innerHTML='<div style="text-align:center;padding:40px"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="color:var(--bl);font-size:14px">Could not connect. Retrying…</p></div>';
+    }
+    resolve(null);
+  },8000));
+
   let raw;
-  try{raw=await(await fetch(C.API+'?t='+Date.now())).json()}catch{
-    // Show error state instead of hanging forever
+  try{
+    const result=await Promise.race([
+      fetch(C.API+'?t='+Date.now()).then(r=>r.json()),
+      timeout
+    ]);
+    if(!result) return;
+    raw=result;
+  }catch{
     $('ldogs').innerHTML='<div style="text-align:center;padding:40px"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="color:var(--bl);font-size:14px">Could not connect. Retrying…</p></div>';
     return;
   }
