@@ -672,27 +672,13 @@ const preload=list=>('requestIdleCallback' in window?requestIdleCallback:f=>setT
   (()=>list.forEach(d=>{if(d.photo){const i=new Image();i.src=d.photo}}));
 
 // ── DATA LOADING ──────────────────────────────────────────────────────────
-async function loadDogs(){
-  // Timeout — never hang forever
-  const timeout=new Promise(resolve=>setTimeout(()=>{
-    if($('ldogs').style.display!=='none'){
-      $('ldogs').innerHTML='<div style="text-align:center;padding:40px"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="color:var(--bl);font-size:14px">Could not connect. Retrying…</p></div>';
-    }
-    resolve(null);
-  },8000));
+async function fetchDogs(){
+  try{return await(await fetch(C.API+'?t='+Date.now())).json()}catch{return null}
+}
 
-  let raw;
-  try{
-    const result=await Promise.race([
-      fetch(C.API+'?t='+Date.now()).then(r=>r.json()),
-      timeout
-    ]);
-    if(!result) return;
-    raw=result;
-  }catch{
-    $('ldogs').innerHTML='<div style="text-align:center;padding:40px"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="color:var(--bl);font-size:14px">Could not connect. Retrying…</p></div>';
-    return;
-  }
+async function loadDogs(){
+  const raw=await fetchDogs();
+  if(!raw) return;
   const rows=Array.isArray(raw[0])?raw:[raw];
   const t0=today0(),t0ms=t0.getTime();
   const filtered=rows.filter(r=>{
