@@ -724,6 +724,18 @@ async function loadDogs(){
 }
 loadDogs();setInterval(loadDogs,C.REF*1000);
 
+// Sync extras entre devices a cada 15s independente de mudança na lista
+setInterval(async()=>{
+  if(!dogs.length) return;
+  const prevESig=extrasSig;
+  await syncExtras(dogs);
+  const newESig=dogs.map(d=>JSON.stringify(d.extras)).join('|');
+  if(newESig!==prevESig){
+    extrasSig=newESig;window._dogs=dogs;
+    _invalidate();if(window._pairs)_renderNearby(cur,window._pairs);
+  }
+},15000);
+
 // ── EXTRAS ────────────────────────────────────────────────────────────────
 const eKey=dog=>'extras_'+String(dog.id||dog.name).replace(/\s+/g,'_');
 function saveExtras(dog){
@@ -1223,7 +1235,13 @@ function openListDetail(dog){
     <div class="sbadges">${badges}</div>
     <div class="sextras" id="list-ex${idx}">${(dog.extras||[]).map(x=>`<span class="etag">${x.n}${x.p>0?' $'+x.p:''}</span>`).join('')}</div>`;
 }
-function closeListDetail(){$('list-detail').style.display='none';renderDogsList()}
+function closeListDetail(){
+  $('list-detail').style.display='none';
+  $('list-detail-blur').style.backgroundImage='none';
+  $('list-detail-photo').style.backgroundImage='none';
+  $('list-detail-info').innerHTML='';
+  renderDogsList();
+}
 
 // ── PICK UP ───────────────────────────────────────────────────────────────
 let _pickupDB=[],_pickupActive=[],_pickupGroups=[],_pickupEditing=false,_pickupDBLoaded=false,_pickupDragDog=null,_pickupPollTimer=null;
