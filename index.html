@@ -281,13 +281,89 @@ let curIdx = 0;
 let slideTimer = null;
 let renderRequested = false;
 let lastRenderedKey = null;
-// PERF: track which mode was last rendered, so when user switches modes
-// we know to do a fresh render of the now-active mode.
 let lastRenderedMode = null;
 
 const decodedUrls = new Set();
 
-// Helpers
+// ─── Thumbnail cache (PERF) ───────────────────────────────────────────────
+// The List view shows photos as 58x58 circles, but the source images are
+// full-resolution (often 3000px+ from iPhone uploads). Decoding 18 of those
+// into the page eats hundreds of MB of RAM and bogs down the main thread on
+// every mode switch. We resize each photo to 120x120 in a canvas the FIRST
+// time we see it, cache the resulting data URL, and reuse it forever after.
+const THUMB_SIZE = 120; // 2× display size for retina sharpness
+const thumbCache = new Map(); // url -> data URL (or null = pending/failed)
+const thumbInFlight = new Map(); // url -> Promise (so we don't resize twice)
+
+function makeThumb(url){
+  if(!url) return Promise.resolve(null);
+  if(thumbCache.has(url)) return Promise.resolve(thumbCache.get(url));
+  if(thumbInFlight.has(url)) return thumbInFlight.get(url);
+
+  const promise = new Promise((resolve) => {
+    const img = new Image();
+    // crossOrigin needed so canvas isn't tainted. If server doesn't send
+    // CORS headers, the image fails to load and we resolve with null
+    // (which makes the renderer fall back to using the original URL).
+    img.crossOrigin = 'anonymous';
+    img.decoding = 'async';
+
+    img.onload = () => {
+      try{
+        const canvas = document.createElement('canvas');
+        canvas.width = THUMB_SIZE;
+        canvas.height = THUMB_SIZE;
+        const ctx = canvas.getContext('2d');
+        // Cover-style draw: scale and crop to square center
+        const sw = img.naturalWidth, sh = img.naturalHeight;
+        if(!sw || !sh){ thumbCache.set(url, null); resolve(null); return; }
+        const scale = Math.max(THUMB_SIZE / sw, THUMB_SIZE / sh);
+        const dw = sw * scale, dh = sh * scale;
+        const dx = (THUMB_SIZE - dw) / 2, dy = (THUMB_SIZE - dh) / 2;
+        ctx.drawImage(img, dx, dy, dw, dh);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+        thumbCache.set(url, dataUrl);
+        resolve(dataUrl);
+      }catch(e){
+        // Tainted canvas (no CORS), or any other draw error → cache null
+        // so we don't retry, fall back to original URL in renderer.
+        thumbCache.set(url, null);
+        resolve(null);
+      }
+    };
+    img.onerror = () => {
+      thumbCache.set(url, null);
+      resolve(null);
+    };
+
+    img.src = url;
+  }).finally(() => {
+    thumbInFlight.delete(url);
+  });
+
+  thumbInFlight.set(url, promise);
+  return promise;
+}
+
+// Kick off thumb generation for a list of dogs in the background. When
+// thumbs become ready, request a re-render so cards swap to the lighter src.
+function warmupThumbs(dogs){
+  let anyNew = false;
+  for(const dog of dogs){
+    const url = dogPhoto(dog);
+    if(!url || thumbCache.has(url) || thumbInFlight.has(url)) continue;
+    anyNew = true;
+    makeThumb(url).then(() => {
+      // When all thumbs for current visible set are ready (or this was the
+      // last one), request a fresh render so the list swaps to data URLs.
+      // Use rAF to coalesce multiple completions.
+      if(currentMode === 'list') requestRender(true);
+    });
+  }
+  return anyNew;
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────
 function escapeHtml(s){return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function tsToDate(ts){
   if(!ts) return null;
@@ -450,10 +526,6 @@ async function buildVisibleDogs(){
   });
 }
 
-// PERF: only render the active mode. The inactive mode is hidden via CSS
-// (display:none on #display or #list); rendering it would create DOM for no
-// visual benefit, plus consume CPU/memory. When user switches modes, setMode
-// triggers a fresh render of the newly-active mode.
 function requestRender(force){
   if(force) lastRenderedKey = null;
   if(renderRequested) return;
@@ -464,9 +536,13 @@ function requestRender(force){
     const key = visibleDogs.map(e =>
       e.appt.id+':'+e.dog.id+':'+(e.appt.status||'')+':'+(e.appt.type||'')+':'+(e.appt.endDate?.seconds||0)
     ).join('|') + '#' + currentMode;
-    if(key === lastRenderedKey) return;
+    if(key === lastRenderedKey && !force) return;
     lastRenderedKey = key;
     lastRenderedMode = currentMode;
+    // PERF: kick off thumbnail generation for new dogs in the background.
+    // Cards will render with original URL first, then swap to thumbs as
+    // they become ready (warmupThumbs triggers a re-render on completion).
+    warmupThumbs(visibleDogs.map(v => v.dog));
     // Render ONLY the active mode
     if(currentMode === 'list') renderList();
     else renderDisplay();
@@ -515,8 +591,16 @@ function renderList(){
 function renderListCard({appt, dog}){
   const photo = dogPhoto(dog);
   const initials = dogInitials(dog.name);
+  // PERF: prefer cached thumbnail (data URL ~10kB) over original photo.
+  // If thumb isn't ready yet, fall back to original URL — the renderer
+  // will be called again once warmupThumbs finishes.
+  let imgSrc = '';
+  if(photo){
+    const cached = thumbCache.get(photo);
+    imgSrc = cached || photo; // null cache (failed CORS) falls back to original
+  }
   const photoInner = photo
-    ? `<img src="${escapeHtml(photo)}" alt="" loading="lazy" decoding="async"/>`
+    ? `<img src="${escapeHtml(imgSrc)}" alt="" loading="lazy" decoding="async"/>`
     : initials;
   const bdayAge = isBirthdayToday(dog.dob);
   const age = calcAge(dog.dob);
@@ -609,6 +693,8 @@ function schedulePredecodeNext(){
 }
 
 function renderSlideHalf({appt, dog}){
+  // Display uses ORIGINAL high-resolution photo (covers half the screen,
+  // needs the detail). Only the List uses thumbnails.
   const photo = dogPhoto(dog);
   const bdayAge = isBirthdayToday(dog.dob);
   const age = calcAge(dog.dob);
@@ -688,9 +774,6 @@ window.addEventListener('resize', () => {
   }
 });
 
-// PERF: when user switches modes, clear the OTHER mode's DOM (free memory)
-// and render the now-active one. Stops the previously-active mode from
-// keeping image elements in memory.
 function setMode(mode){
   const previousMode = currentMode;
   currentMode = mode;
@@ -700,8 +783,6 @@ function setMode(mode){
   $('display').classList.toggle('on', mode === 'display');
   $('list').classList.toggle('on', mode === 'list');
 
-  // Clear the now-inactive mode's DOM so its <img> elements stop holding
-  // memory. They'll be re-built next time the user activates that mode.
   if(previousMode && previousMode !== mode){
     if(previousMode === 'display'){
       $('slideshow').innerHTML = '';
@@ -713,7 +794,6 @@ function setMode(mode){
     }
   }
 
-  // Render the active mode if its DOM is empty or stale
   if(mode === 'list'){
     if(lastRenderedMode !== 'list') renderList();
     lastRenderedMode = 'list';
