@@ -26,6 +26,43 @@ html,body{height:100%;overflow:hidden}
 body{font-family:'Lato',sans-serif;color:var(--white);background:#3D6E91}
 .app{height:100vh;display:flex;flex-direction:column}
 
+/* ─── Splash screen ──────────────────────────────────────────────────────
+   Shown on initial page load only. Fades out once Firestore has delivered
+   the first snapshot AND a minimum visible duration has elapsed (so the
+   animation is intentional, not a flash). Hidden completely after fade-out;
+   never re-appears for mode switches. */
+#splash{
+  position:fixed;inset:0;z-index:1000;
+  background:linear-gradient(135deg, var(--bp-dark) 0%, var(--bp-darker) 100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:20px;
+  opacity:1;
+  transition:opacity 400ms ease-out;
+  pointer-events:none;
+}
+#splash.fade-out{opacity:0}
+#splash.gone{display:none}
+.splash-logo{
+  width:120px;height:120px;
+  display:flex;align-items:center;justify-content:center;
+  filter:drop-shadow(0 8px 24px rgba(0,0,0,.35));
+  animation:splash-breathe 2.4s ease-in-out infinite;
+}
+.splash-logo img{width:100%;height:100%;object-fit:contain}
+@keyframes splash-breathe{
+  0%, 100% { transform: scale(1);   opacity: .92 }
+  50%      { transform: scale(1.06); opacity: 1   }
+}
+.splash-brand{
+  font-family:'Righteous',sans-serif;
+  font-size:28px;letter-spacing:.5px;color:var(--white);
+  text-align:center;
+}
+.splash-loc{
+  font-size:11px;letter-spacing:3px;text-transform:uppercase;
+  color:var(--gold-light);font-weight:700;margin-top:6px;
+}
+
 .topbar{flex-shrink:0;padding:env(safe-area-inset-top) 24px 0;background:#2E5665;border-bottom:1px solid var(--border-soft);z-index:50}
 .topbar-inner{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:14px;height:60px}
 .brand{display:flex;align-items:center;gap:12px}
@@ -171,10 +208,24 @@ body{font-family:'Lato',sans-serif;color:var(--white);background:#3D6E91}
   .list-inner{padding:18px 14px 50px}
   .page-title{font-size:24px}
   .dog-grid{grid-template-columns:1fr;gap:10px}
+  .splash-logo{width:90px;height:90px}
+  .splash-brand{font-size:22px}
+  .splash-loc{font-size:10px;letter-spacing:2.5px}
 }
 </style>
 </head>
 <body>
+
+<!-- Splash screen: visible on initial load, fades out when ready -->
+<div id="splash">
+  <div class="splash-logo">
+    <img src="https://fidoplayhouseny.com/assets/img/logo-fido.png" alt="Fido"/>
+  </div>
+  <div>
+    <div class="splash-brand">Fido Playhouse</div>
+    <div class="splash-loc">Williamsburg</div>
+  </div>
+</div>
 
 <div class="app">
   <header class="topbar">
@@ -285,15 +336,39 @@ let lastRenderedMode = null;
 
 const decodedUrls = new Set();
 
+// ─── Splash screen lifecycle ─────────────────────────────────────────────
+// Splash starts visible (HTML loads with #splash present). We hide it when:
+//   1. The first Firestore snapshot has arrived AND been rendered, AND
+//   2. A minimum visible duration has elapsed (so the animation reads as
+//      intentional, not a glitch).
+// Or: a maximum timeout fires (safety net so a network failure doesn't
+// trap the user behind the splash forever).
+const SPLASH_MIN_MS = 800;   // never less than this → animation is visible
+const SPLASH_MAX_MS = 4000;  // never more than this → bail out if data is slow
+const splashStart = performance.now();
+let splashHidden = false;
+
+function hideSplash(){
+  if(splashHidden) return;
+  splashHidden = true;
+  const elapsed = performance.now() - splashStart;
+  const remaining = Math.max(0, SPLASH_MIN_MS - elapsed);
+  setTimeout(() => {
+    const el = $('splash');
+    if(!el) return;
+    el.classList.add('fade-out');
+    // After the CSS transition completes, fully remove from layout.
+    setTimeout(() => el.classList.add('gone'), 450);
+  }, remaining);
+}
+// Safety net: if data hasn't arrived after SPLASH_MAX_MS, hide anyway so the
+// user isn't stuck on the splash because of a network problem.
+setTimeout(hideSplash, SPLASH_MAX_MS);
+
 // ─── Thumbnail cache (PERF) ───────────────────────────────────────────────
-// The List view shows photos as 58x58 circles, but the source images are
-// full-resolution (often 3000px+ from iPhone uploads). Decoding 18 of those
-// into the page eats hundreds of MB of RAM and bogs down the main thread on
-// every mode switch. We resize each photo to 120x120 in a canvas the FIRST
-// time we see it, cache the resulting data URL, and reuse it forever after.
-const THUMB_SIZE = 120; // 2× display size for retina sharpness
-const thumbCache = new Map(); // url -> data URL (or null = pending/failed)
-const thumbInFlight = new Map(); // url -> Promise (so we don't resize twice)
+const THUMB_SIZE = 120;
+const thumbCache = new Map();
+const thumbInFlight = new Map();
 
 function makeThumb(url){
   if(!url) return Promise.resolve(null);
@@ -302,19 +377,14 @@ function makeThumb(url){
 
   const promise = new Promise((resolve) => {
     const img = new Image();
-    // crossOrigin needed so canvas isn't tainted. If server doesn't send
-    // CORS headers, the image fails to load and we resolve with null
-    // (which makes the renderer fall back to using the original URL).
     img.crossOrigin = 'anonymous';
     img.decoding = 'async';
-
     img.onload = () => {
       try{
         const canvas = document.createElement('canvas');
         canvas.width = THUMB_SIZE;
         canvas.height = THUMB_SIZE;
         const ctx = canvas.getContext('2d');
-        // Cover-style draw: scale and crop to square center
         const sw = img.naturalWidth, sh = img.naturalHeight;
         if(!sw || !sh){ thumbCache.set(url, null); resolve(null); return; }
         const scale = Math.max(THUMB_SIZE / sw, THUMB_SIZE / sh);
@@ -325,42 +395,26 @@ function makeThumb(url){
         thumbCache.set(url, dataUrl);
         resolve(dataUrl);
       }catch(e){
-        // Tainted canvas (no CORS), or any other draw error → cache null
-        // so we don't retry, fall back to original URL in renderer.
         thumbCache.set(url, null);
         resolve(null);
       }
     };
-    img.onerror = () => {
-      thumbCache.set(url, null);
-      resolve(null);
-    };
-
+    img.onerror = () => { thumbCache.set(url, null); resolve(null); };
     img.src = url;
-  }).finally(() => {
-    thumbInFlight.delete(url);
-  });
+  }).finally(() => { thumbInFlight.delete(url); });
 
   thumbInFlight.set(url, promise);
   return promise;
 }
 
-// Kick off thumb generation for a list of dogs in the background. When
-// thumbs become ready, request a re-render so cards swap to the lighter src.
 function warmupThumbs(dogs){
-  let anyNew = false;
   for(const dog of dogs){
     const url = dogPhoto(dog);
     if(!url || thumbCache.has(url) || thumbInFlight.has(url)) continue;
-    anyNew = true;
     makeThumb(url).then(() => {
-      // When all thumbs for current visible set are ready (or this was the
-      // last one), request a fresh render so the list swaps to data URLs.
-      // Use rAF to coalesce multiple completions.
       if(currentMode === 'list') requestRender(true);
     });
   }
-  return anyNew;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -539,13 +593,12 @@ function requestRender(force){
     if(key === lastRenderedKey && !force) return;
     lastRenderedKey = key;
     lastRenderedMode = currentMode;
-    // PERF: kick off thumbnail generation for new dogs in the background.
-    // Cards will render with original URL first, then swap to thumbs as
-    // they become ready (warmupThumbs triggers a re-render on completion).
     warmupThumbs(visibleDogs.map(v => v.dog));
-    // Render ONLY the active mode
     if(currentMode === 'list') renderList();
     else renderDisplay();
+    // The first render after data arrival is when the page is "ready".
+    // Hide the splash now (subject to SPLASH_MIN_MS minimum).
+    hideSplash();
   });
 }
 
@@ -591,13 +644,10 @@ function renderList(){
 function renderListCard({appt, dog}){
   const photo = dogPhoto(dog);
   const initials = dogInitials(dog.name);
-  // PERF: prefer cached thumbnail (data URL ~10kB) over original photo.
-  // If thumb isn't ready yet, fall back to original URL — the renderer
-  // will be called again once warmupThumbs finishes.
   let imgSrc = '';
   if(photo){
     const cached = thumbCache.get(photo);
-    imgSrc = cached || photo; // null cache (failed CORS) falls back to original
+    imgSrc = cached || photo;
   }
   const photoInner = photo
     ? `<img src="${escapeHtml(imgSrc)}" alt="" loading="lazy" decoding="async"/>`
@@ -693,8 +743,6 @@ function schedulePredecodeNext(){
 }
 
 function renderSlideHalf({appt, dog}){
-  // Display uses ORIGINAL high-resolution photo (covers half the screen,
-  // needs the detail). Only the List uses thumbnails.
   const photo = dogPhoto(dog);
   const bdayAge = isBirthdayToday(dog.dob);
   const age = calcAge(dog.dob);
@@ -824,6 +872,8 @@ const unsub = onSnapshot(q,
     console.error('Snapshot error', err);
     $('err').textContent = 'Connection error: '+(err.message||err.code||'unknown');
     $('err').classList.add('show');
+    // Hide splash on connection error too — user shouldn't be stuck.
+    hideSplash();
   }
 );
 
