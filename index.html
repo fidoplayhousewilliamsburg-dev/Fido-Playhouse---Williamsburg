@@ -51,16 +51,11 @@ body{font-family:'Lato',sans-serif;color:var(--white);background:#3D6E91}
 .slide-half{
   flex:1;height:100%;position:relative;overflow:hidden;
   border-right:1px solid rgba(255,255,255,.16);
-  /* PERF: isolate compositing layer for smooth slide transitions */
   contain:layout paint;
   background:var(--bp-darker);
 }
 .slide-half:last-child{border-right:none}
 
-/* PERF: single <img> renders both the centered photo AND the blurred backdrop
-   (via ::before pseudo-element using same image source). Browser downloads &
-   decodes the image ONCE per slide instead of twice. backdrop-filter is
-   GPU-composited, much cheaper than filter:blur on a separate element. */
 .slide-photo{
   position:absolute;inset:0;width:100%;height:100%;
   object-fit:contain;object-position:center 38%;
@@ -69,10 +64,8 @@ body{font-family:'Lato',sans-serif;color:var(--white);background:#3D6E91}
 .slide-photo-bg{
   position:absolute;inset:-6%;width:112%;height:112%;
   object-fit:cover;
-  /* PERF: reduced blur radius from 24px → 14px (visually similar, ~40% cheaper) */
   filter:blur(14px) brightness(.55);
   z-index:0;
-  /* PERF: hint browser to use compositor layer */
   will-change:filter;
   transform:translateZ(0);
 }
@@ -119,11 +112,6 @@ body{font-family:'Lato',sans-serif;color:var(--white);background:#3D6E91}
 .dog-card{
   background:var(--glass);border:1px solid var(--border);border-radius:16px;
   padding:16px;display:flex;align-items:center;gap:12px;position:relative;
-  /* PERF: skip rendering of cards outside viewport (huge scroll boost) */
-  content-visibility:auto;
-  /* PERF: reserve estimated height so scroll bar doesn't jump */
-  contain-intrinsic-size:auto 92px;
-  /* PERF: isolate paint/layout — changes in one card don't recalc others */
   contain:layout paint;
 }
 .dog-photo{
@@ -135,8 +123,6 @@ body{font-family:'Lato',sans-serif;color:var(--white);background:#3D6E91}
   overflow:hidden;
   position:relative;
 }
-/* PERF: real <img> with loading=lazy + decoding=async. Cards out of viewport
-   don't download until needed; decode happens off main thread. */
 .dog-photo img{
   width:100%;height:100%;
   object-fit:cover;
@@ -295,8 +281,10 @@ let curIdx = 0;
 let slideTimer = null;
 let renderRequested = false;
 let lastRenderedKey = null;
+// PERF: track which mode was last rendered, so when user switches modes
+// we know to do a fresh render of the now-active mode.
+let lastRenderedMode = null;
 
-// PERF: track which image URLs we've already pre-decoded to avoid duplicate work
 const decodedUrls = new Set();
 
 // Helpers
@@ -379,17 +367,13 @@ const SECTION_DEFS = [
   {key:'other',label:'Other',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>'},
 ];
 
-// PERF: pre-decode an image URL off the main thread. Idempotent (uses cache).
-// When called for the next slide's photo, the browser will already have it
-// decoded by the time the user clicks Next.
 function predecode(url){
   if(!url || decodedUrls.has(url)) return;
   decodedUrls.add(url);
   const img = new Image();
   img.decoding = 'async';
   img.src = url;
-  // .decode() returns a promise; we don't need to await — fire-and-forget.
-  if(img.decode){ img.decode().catch(() => {/* expected on cross-origin or 404 */}); }
+  if(img.decode){ img.decode().catch(() => {}); }
 }
 
 // Clock
@@ -401,7 +385,7 @@ function tickClock(){
 tickClock();
 setInterval(tickClock, 30000);
 
-// Boundary watcher (only triggers re-render when 19:30 / midnight crossed)
+// Boundary watcher
 let lastBoundary = isAfter1930();
 let lastDateKey = new Date().toDateString();
 setInterval(() => {
@@ -413,36 +397,22 @@ setInterval(() => {
   }
 }, 60000);
 
-// Filter + dedup
 function shouldShow(appt){
   const status = String(appt.status||'').toLowerCase();
-  // FIX (status): 'checked_out' removed from blacklist. Gingr sends spurious
-  // checking_out webhooks (e.g., when staff edits a reservation) that
-  // incorrectly flip status to checked_out. We trust endDate as the source
-  // of truth. Cancellations remain blacklisted because those are real.
   if(['canceled','cancelled','no_show'].includes(status)) return false;
   const now = new Date();
-  // FIX (check-in time): prefer real check-in time over scheduled startDate
-  // so boardings with future startDate (e.g., scheduled arrival 2:00 PM)
-  // still show when the dog has already physically checked in.
   const ci = tsToDate(appt.checkInAt || appt.checkInTime || appt.startDate);
   const co = tsToDate(appt.endDate || appt.checkOutTime);
   if(!ci) return false;
   if(ci > now) return false;
   if(!co) return true;
-  // FIX (today's checkouts): if endDate is in the past but on the SAME day,
-  // the dog is still physically here — staff just hasn't done checkout yet.
-  // Only hide if endDate is from a previous day (e.g., boarding ended yesterday).
   if(co < now && !isSameDay(co, now)) return false;
-  // Same-day dogs (including those whose scheduled checkout time has passed)
-  // remain visible until 19:30.
   if(isAfter1930() && isSameDay(co, now)) return false;
   return true;
 }
 function score(a){
   let s = 0;
   if(a.status === 'checked_in') s += 1e9;
-  // Same priority change as shouldShow
   const t = tsToDate(a.checkInAt || a.startDate || a.updatedAt || a.createdAt);
   if(t) s += t.getTime() / 1000;
   return s;
@@ -474,14 +444,16 @@ async function buildVisibleDogs(){
     const aB = isBirthdayToday(a.dog.dob) !== null ? 1 : 0;
     const bB = isBirthdayToday(b.dog.dob) !== null ? 1 : 0;
     if(aB !== bB) return bB - aB;
-    // Same priority change as shouldShow/score
     const ca = tsToDate(a.appt.checkInAt || a.appt.startDate)?.getTime() || 0;
     const cb = tsToDate(b.appt.checkInAt || b.appt.startDate)?.getTime() || 0;
     return ca - cb;
   });
 }
 
-// Coalesce snapshot updates to one render per animation frame
+// PERF: only render the active mode. The inactive mode is hidden via CSS
+// (display:none on #display or #list); rendering it would create DOM for no
+// visual benefit, plus consume CPU/memory. When user switches modes, setMode
+// triggers a fresh render of the newly-active mode.
 function requestRender(force){
   if(force) lastRenderedKey = null;
   if(renderRequested) return;
@@ -489,14 +461,15 @@ function requestRender(force){
   requestAnimationFrame(async () => {
     renderRequested = false;
     await buildVisibleDogs();
-    // Skip render if visible state didn't change
     const key = visibleDogs.map(e =>
       e.appt.id+':'+e.dog.id+':'+(e.appt.status||'')+':'+(e.appt.type||'')+':'+(e.appt.endDate?.seconds||0)
     ).join('|') + '#' + currentMode;
     if(key === lastRenderedKey) return;
     lastRenderedKey = key;
-    renderList();
-    renderDisplay();
+    lastRenderedMode = currentMode;
+    // Render ONLY the active mode
+    if(currentMode === 'list') renderList();
+    else renderDisplay();
   });
 }
 
@@ -542,8 +515,6 @@ function renderList(){
 function renderListCard({appt, dog}){
   const photo = dogPhoto(dog);
   const initials = dogInitials(dog.name);
-  // PERF: real <img> with native lazy + async decode. Browser handles
-  // out-of-viewport cards efficiently.
   const photoInner = photo
     ? `<img src="${escapeHtml(photo)}" alt="" loading="lazy" decoding="async"/>`
     : initials;
@@ -619,15 +590,11 @@ function renderDisplay(){
     $('next').style.display = 'none';
   }
 
-  // PERF: pre-decode photos for the NEXT slide so the next click feels instant
   schedulePredecodeNext();
 
   if(currentMode === 'display') startAutoplay();
 }
 
-// PERF: schedule pre-decoding of next slide's photos using requestIdleCallback
-// (or fallback to setTimeout). Runs when browser is idle, doesn't compete
-// with current frame's rendering work.
 function schedulePredecodeNext(){
   if(pairs.length <= 1) return;
   const nextIdx = (curIdx + 1) % pairs.length;
@@ -659,10 +626,6 @@ function renderSlideHalf({appt, dog}){
   if(fixed) badges.push(`<span class="slide-badge">${fixed}</span>`);
   if(age) badges.push(`<span class="slide-badge">${age}</span>`);
 
-  // PERF: 2 <img> elements but with same src — browser deduplicates the
-  // network request and uses a SINGLE decoded bitmap for both. The cover-blur
-  // backdrop and the contained foreground share the same image data.
-  // decoding=async lets the decode happen off main thread.
   const photoBlock = photo
     ? `<img class="slide-photo-bg" src="${escapeHtml(photo)}" alt="" decoding="async" aria-hidden="true"/>
        <img class="slide-photo" src="${escapeHtml(photo)}" alt="" decoding="async"/>`
@@ -683,12 +646,9 @@ function renderSlideHalf({appt, dog}){
 function goTo(idx){
   if(!pairs.length) return;
   curIdx = ((idx % pairs.length) + pairs.length) % pairs.length;
-  // Re-render only the slide content, not the dots/counter (avoid thrashing)
   const ss = $('slideshow');
   ss.innerHTML = `<div class="slide">${pairs[curIdx].map(renderSlideHalf).join('')}</div>`;
-  // Update active dot
   [...$('dots').querySelectorAll('.dot')].forEach((d,i) => d.classList.toggle('on', i === curIdx));
-  // PERF: pre-decode the slide AFTER this one to keep ahead of user clicks
   schedulePredecodeNext();
   startAutoplay();
 }
@@ -728,18 +688,39 @@ window.addEventListener('resize', () => {
   }
 });
 
-// Mode
+// PERF: when user switches modes, clear the OTHER mode's DOM (free memory)
+// and render the now-active one. Stops the previously-active mode from
+// keeping image elements in memory.
 function setMode(mode){
+  const previousMode = currentMode;
   currentMode = mode;
   localStorage.setItem('fido_staff_mode_v2', mode);
   $('btn-display').classList.toggle('on', mode === 'display');
   $('btn-list').classList.toggle('on', mode === 'list');
   $('display').classList.toggle('on', mode === 'display');
   $('list').classList.toggle('on', mode === 'list');
-  if(mode === 'display'){
-    if(pairs.length > 0) startAutoplay();
+
+  // Clear the now-inactive mode's DOM so its <img> elements stop holding
+  // memory. They'll be re-built next time the user activates that mode.
+  if(previousMode && previousMode !== mode){
+    if(previousMode === 'display'){
+      $('slideshow').innerHTML = '';
+      pairs = [];
+      curIdx = 0;
+      stopAutoplay();
+    }else{
+      $('list-content').innerHTML = '';
+    }
+  }
+
+  // Render the active mode if its DOM is empty or stale
+  if(mode === 'list'){
+    if(lastRenderedMode !== 'list') renderList();
+    lastRenderedMode = 'list';
   }else{
-    stopAutoplay();
+    if(lastRenderedMode !== 'display') renderDisplay();
+    lastRenderedMode = 'display';
+    if(pairs.length > 0) startAutoplay();
   }
 }
 $('btn-display').addEventListener('click', () => setMode('display'));
