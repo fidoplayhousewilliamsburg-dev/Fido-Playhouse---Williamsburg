@@ -352,7 +352,12 @@ setInterval(() => {
 // Filter + dedup
 function shouldShow(appt){
   const status = String(appt.status||'').toLowerCase();
-  if(['checked_out','canceled','cancelled','no_show'].includes(status)) return false;
+  // FIX: 'checked_out' removed from blacklist. Gingr sends spurious checking_out
+  // webhooks (e.g., when staff edits a reservation) that incorrectly flip status
+  // to checked_out. We trust endDate as the source of truth instead — a dog is
+  // visible while endDate is in the future and (for same-day) until 19:30.
+  // Cancellations remain blacklisted because those are real terminations.
+  if(['canceled','cancelled','no_show'].includes(status)) return false;
   const now = new Date();
   // FIX: prefer real check-in time over scheduled startDate so boardings
   // with future startDate (e.g., scheduled arrival 2:00 PM) still show
